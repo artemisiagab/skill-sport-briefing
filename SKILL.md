@@ -1,62 +1,107 @@
 ---
 name: sport-briefing
-description: Produce the daily sports briefing: fetch upcoming events (Sofascore) plus top news (Gazzetta RSS + FormulaPassion F1) for Fiorentina, AC Milan, Sinner, Italy volleyball, MotoGP, and Formula 1; use LLM judgment to pick 0-4 relevant news per topic and write an idempotent daily page to a Notion database.
+description: 'Produce the daily sports briefing: fetch upcoming events (Sofascore) plus top news (Gazzetta RSS + FormulaPassion F1) for Fiorentina, AC Milan, Sinner, Italy volleyball, MotoGP, and Formula 1; use LLM judgment to pick 0-4 relevant news per topic and write an idempotent daily page to a Notion database.'
 ---
 
-# Daily briefing (Sofascore + News → Notion)
+# Daily Sport Briefing — Skill
 
-## Goal
+Fetch events + news, select the best items, publish to Notion + markdown.
 
-Create/update the Notion page:
+## Pipeline (3 steps)
 
-- Title: `Riepilogo Sportivo Giornaliero del YYYY-MM-DD` (Europe/Rome)
-- Database: Document Hub (`315c392a8f7a80cbb1b6d16994e18f58`)
-- Category: `Riepilogo Sportivo Giornaliero`
-- Sections: separate tables per topic + up to 4 news items per topic.
-
-News requirements:
-- For each topic, include **0–4** news items (0 if nothing relevant).
-- Each news item is **one paragraph**: a short Italian recap + the **full link**.
-
-Time formatting:
-- Human friendly (e.g. "Next Tuesday at 20:45 (Tue 02.Mar)", "In 2 weeks at 20:45 (Tue 22.Mar)").
-
-## How to run (deterministic + intelligent)
-
-1) Gather deterministic payload (events + RSS lists):
+### Step 1 — Gather data (deterministic)
 
 ```bash
-python3 /home/gabrielc/.openclaw/workspace/skills/daily-briefing/scripts/gather_payload.py --out /home/gabrielc/.openclaw/workspace/reports/daily-briefing/payload.json
+python3 scripts/gather_payload.py
 ```
 
-2) Use LLM judgment to:
-- pick the most relevant 0–4 news items per topic
-- generate a **1-paragraph Italian recap** for each item (do not hallucinate; base on RSS description and, when needed, fetch the linked page with web_fetch)
-- produce a `briefing.json` that matches the schema expected by `write_notion_from_briefing.py`
+Produces two files:
+- `~/.openclaw/workspace/reports/sport-briefing/events.json` — formatted event tables
+- `~/.openclaw/workspace/reports/sport-briefing/news.json` — raw RSS/web candidates
 
-3) Write to Notion (idempotent):
+### Step 2 — Select news & write recaps (LLM)
 
-```bash
-python3 /home/gabrielc/.openclaw/workspace/skills/daily-briefing/scripts/write_notion_from_briefing.py --in /home/gabrielc/.openclaw/workspace/reports/daily-briefing/briefing.json
-```
+Read both files. For each section in `events.json`, look up the matching key
+in `news.json → candidates` and **select 0–4** of the most relevant and fresh
+news items.
 
-## Input/Output schema
+| Section | Candidates key | Selection guidance |
+|---|---|---|
+| Fiorentina | `Fiorentina` | Only items about Fiorentina (injuries, lineup, transfers, match analysis) |
+| AC Milan | `AC Milan` | Only items about AC Milan |
+| Jannik Sinner | `Jannik Sinner` | Items about Sinner or directly relevant opponents |
+| Italia Volley (Men) | — | No feed; leave empty |
+| Italia Volley (Women) | — | No feed; leave empty |
+| MotoGP (...) | `MotoGP` | Race weekend, results, riders, team news |
+| Formula 1 (...) | `Formula 1` | Race weekend, results, drivers, team news |
 
-- `payload.json` is produced by gather_payload.py
-- `briefing.json` must be:
+For each selected item, write a **`recap`** field: 1–2 sentences in Italian,
+factual, based on the candidate's `summary` (and if too vague, fetch the
+linked page for detail). Never hallucinate facts.
+
+Then build `briefing.json`:
 
 ```json
 {
-  "pageTitle": "Riepilogo Sportivo Giornaliero del 2026-02-28",
-  "intro": "...",
+  "pageTitle": "<from events.json>",
+  "intro": "<from events.json>",
   "sections": [
     {
-      "title": "Fiorentina",
-      "table": {"header": ["Match", "When", "Competition", "Round"], "rows": [["...", "...", "...", "..."]]},
-      "news": [{"title": "...", "link": "https://...", "recap": "..."}]
+      "title": "<from events.json>",
+      "table": { "header": [...], "rows": [...] },
+      "news": [
+        { "title": "...", "link": "https://...", "recap": "..." }
+      ]
     }
   ]
 }
 ```
 
-Notion token is read from: `~/.openclaw/credentials/notion.token`.
+Save to `~/.openclaw/workspace/reports/sport-briefing/briefing.json`.
+
+### Step 3 — Publish to Notion + markdown
+
+```bash
+python3 scripts/save.py
+```
+
+This:
+- Creates/updates the Notion page (idempotent, by title match).
+- Writes `~/.openclaw/workspace/reports/sport-briefing/daily.md`.
+
+Notion database: Document Hub (`315c392a8f7a80cbb1b6d16994e18f58`).
+Token: `~/.openclaw/credentials/notion.token`.
+
+## Output format
+
+### Page title
+`Riepilogo Sportivo Giornaliero del YYYY-MM-DD` (Europe/Rome date)
+
+### Sections (in order)
+1. **Fiorentina** — table: Match | When | Competition | Round
+2. **AC Milan** — table: Match | When | Competition | Round
+3. **Jannik Sinner** — table: Match | When | Tournament | Round
+4. **Italia Volley (Men)** — table: Match | When | Competition | Round
+5. **Italia Volley (Women)** — table: Match | When | Competition | Round
+6. **MotoGP (current/next weekend sessions)** — table: Session | Type | When
+7. **Formula 1 (current/next weekend sessions)** — table: Session | Type | When
+
+### News items
+- **0–4 items** per section (0 if nothing relevant).
+- Rendered under a `### Top news` sub-heading.
+- Each item: `[Title](URL) — Italian recap (1–2 sentences)`.
+- Recap: factual, concise, journalistic Italian. Name athletes/teams, mention scores/dates/decisions.
+
+### "When" column — human-friendly dates
+All times in **Europe/Rome**:
+- Previous day → `Yesterday at HH:MM (Day DD.Mon)`
+- Same day → `Today at HH:MM (Day DD.Mon)`
+- Next day → `Tomorrow at HH:MM (Day DD.Mon)`
+- 2–7 days → `Next Wednesday at HH:MM (Wed DD.Mon)`
+- 8–13 days → `In N days at HH:MM (Day DD.Mon)`
+- 14+ days → `In N weeks at HH:MM (Day DD.Mon)`
+
+## Code conventions
+- **Pure stdlib**: no pip dependencies.
+- **Timezone**: always `Europe/Rome` via `zoneinfo.ZoneInfo`.
+- **Idempotent writes**: find Notion page by title, create if missing, replace all children.
