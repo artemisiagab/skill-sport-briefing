@@ -30,8 +30,8 @@ news items.
 | Fiorentina | `Fiorentina` | Only items about Fiorentina (injuries, lineup, transfers, match analysis) |
 | AC Milan | `AC Milan` | Only items about AC Milan |
 | Jannik Sinner | `Jannik Sinner` | Items about Sinner or directly relevant opponents |
-| Italia Volley (Men) | — | No feed; leave empty |
-| Italia Volley (Women) | — | No feed; leave empty |
+| Italia Volley (Men) | `Italia Volley (Men)` | Items about Italian men's national volleyball team, VNL, Euros, Worlds |
+| Italia Volley (Women) | `Italia Volley (Women)` | Items about Italian women's national volleyball team, VNL, Euros, Worlds |
 | MotoGP (...) | `MotoGP` | Race weekend, results, riders, team news |
 | Formula 1 (...) | `Formula 1` | Race weekend, results, drivers, team news |
 

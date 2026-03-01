@@ -51,6 +51,7 @@ RSS_SERIE_A = "https://www.gazzetta.it/dynamic-feed/rss/section/Calcio/Serie-A.x
 RSS_TENNIS = "https://www.gazzetta.it/dynamic-feed/rss/section/Tennis.xml"
 RSS_MOTOGP = "https://www.gazzetta.it/dynamic-feed/rss/section/Moto/moto-GP.xml"
 RSS_F1 = "https://www.gazzetta.it/dynamic-feed/rss/section/Formula-1.xml"
+RSS_VOLLEY = "https://www.gazzetta.it/dynamic-feed/rss/section/Volley.xml"
 F1_NEWS_FP = "https://www.formulapassion.it/f1/f1-news"
 
 VOLLEY_MAJOR_PATTERNS = [
@@ -364,6 +365,7 @@ def main() -> int:
 
     serie_a = [asdict(x) for x in rss_items(RSS_SERIE_A, "gazzetta-serie-a")]
     tennis = [asdict(x) for x in rss_items(RSS_TENNIS, "gazzetta-tennis")]
+    volley_news = [asdict(x) for x in rss_items(RSS_VOLLEY, "gazzetta-volley")]
     motogp_news = [asdict(x) for x in rss_items(RSS_MOTOGP, "gazzetta-motogp")]
     f1_gazzetta = [asdict(x) for x in rss_items(RSS_F1, "gazzetta-f1")]
     f1_fp = [asdict(x) for x in formulapassion_links()]
@@ -374,6 +376,8 @@ def main() -> int:
             "Fiorentina": serie_a,
             "AC Milan": serie_a,
             "Jannik Sinner": tennis,
+            "Italia Volley (Men)": volley_news,
+            "Italia Volley (Women)": volley_news,
             "MotoGP": motogp_news,
             "Formula 1": f1_gazzetta + f1_fp,
         },
